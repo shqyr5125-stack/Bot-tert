@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>أميرتي — لوحة التحكم السحابية واستوديو تشغيل البوت</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-deep: #060a13;
+      --bg-surface: #0c1322;
+      --bg-elevated: #111b30;
+      --border-glow: rgba(34, 211, 238, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-deep);
+      background-image:
+        radial-gradient(circle at 12% 8%, rgba(34, 211, 238, 0.13), transparent 36%),
+        radial-gradient(circle at 88% 12%, rgba(16, 185, 129, 0.11), transparent 34%),
+        linear-gradient(180deg, #060a13 0%, #09101f 100%);
+      color: #f1f5f9;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
+
+    .panel-card {
+      background: rgba(12, 19, 34, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.55);
+      border-radius: 9999px;
+    }
+
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 9999px;
+    }
+
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(34, 211, 238, 0.5);
+    }
+
+    @keyframes pulseBeacon {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.88); }
+    }
+
+    .beacon {
+      animation: pulseBeacon 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-cyan-500/30 selection:text-cyan-100">
+
+  <!-- Non-blocking Toast Notification (Replaces alert/confirm) -->
+  <div id="toastContainer" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 hidden">
+    <div class="panel-card rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border-cyan-400/40">
+      <div class="flex items-center gap-2.5 text-xs sm:text-sm font-bold">
+        <span id="toastDot" class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+        <span id="toastMsg" class="text-slate-100"></span>
+      </div>
+      <button type="button" id="toastCloseBtn" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+        إغلاق
+      </button>
+    </div>
+  </div>
+
+  <!-- Top Navigation & Live Server Status Bar -->
+  <header class="sticky top-0 z-30 panel-card border-b border-cyan-500/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400/25 via-emerald-400/20 to-indigo-500/25 border border-cyan-400/40 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+          <svg class="w-6 h-6 text-cyan-300" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-base sm:text-xl font-black text-white tracking-tight">
+              أميرتي <span class="text-cyan-400">Cloud Panel</span>
+            </h1>
+            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
+              استضافة + طرفية + محاكاة
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            تحكم سحابي كامل بالبوت والـ Terminal + ملفات النشر المباشرة لـ GitHub و Render
+          </p>
+        </div>
+      </div>
+
+      <!-- Status Indicators & Code Export Trigger -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div id="globalStatusPill" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-400/40 flex items-center gap-2">
+          <span id="globalStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 beacon"></span>
+          <span id="globalStatusText">متصل ويعمل (ONLINE)</span>
+        </div>
+
+        <button type="button" id="openDeployModalBtn" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-gradient-to-l from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-md shadow-cyan-500/20 transition cursor-pointer flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          <span>أكواد الرفع (GitHub & Render)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- Prominent Pairing Code Banner (Appears when pairing is requested) -->
+    <section id="pairingBanner" class="hidden panel-card rounded-2xl p-4 sm:p-5 bg-gradient-to-l from-emerald-950/90 via-teal-950/85 to-cyan-950/90 border-emerald-400/50">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="text-center sm:text-right space-y-1">
+          <div class="inline-flex items-center gap-2 text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+            <span>🔑 كود ربط واتساب جاهز الآن</span>
+          </div>
+          <h2 class="text-base sm:text-lg font-extrabold text-white">
+            افتح واتساب ← الأجهزة المرتبطة ← ربط جهاز ← الربط برقم الهاتف
+          </h2>
+          <p class="text-xs text-emerald-200/80">
+            أدخل هذا الكود المكون من 8 خانات فوراً لإتمام ربط البوت بالسيرفر السحابي.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div id="pairingCodeValue" class="mono text-2xl sm:text-3xl font-black tracking-[0.22em] px-5 py-3 rounded-2xl bg-slate-950/90 text-emerald-300 border border-emerald-400/50 shadow-inner">
+            AMIR-8492
+          </div>
+          <button type="button" id="confirmPairBtn" class="px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+            تأكيد الربط
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 1: Server & Bot Controls + Network Resilience Switcher -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- Live Server & Bot Power Controls -->
+      <div class="lg:col-span-7 panel-card rounded-2xl p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              إدارة السيرفر وتشغيل البوت
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              تحكم بالجلسة، كلمة مرور الإدارة، ورقم الواتساب المرتبط بالسيرفر.
+            </p>
+          </div>
+          <button type="button" id="lockToggleBtn" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition cursor-pointer">
+            🔓 اللوحة مفتوحة (قفل)
+          </button>
+        </div>
+
+        <!-- Phone & Admin Password Inputs -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+          <div class="sm:col-span-4">
+            <label for="adminPassInput" class="block text-[11px] font-bold text-slate-400 mb-1">كلمة مرور الإدارة</label>
+            <input id="adminPassInput" type="password" value="amirati2026" placeholder="amirati2026" class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs sm:text-sm text-white" />
+          </div>
+          <div class="sm:col-span-5">
+            <label for="botPhoneInput" class="block text-[11px] font-bold text-slate-400 mb-1">رقم الواتساب (مع رمز الدولة بدون +)</label>
+            <input id="botPhoneInput" type="text" dir="ltr" value="963958414394" placeholder="963958414394" class="mono w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs sm:text-sm text-emerald-300" />
+          </div>
+          <div class="sm:col-span-3 flex items-end">
+            <button type="button" id="savePhoneStartBtn" class="w-full py-2.5 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/40 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+              حفظ وطلب كود
+            </button>
+          </div>
+        </div>
+
+        <!-- Power Action Buttons -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          <button type="button" id="btnStartBot" class="py-2.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+            ▶️ تشغيل البوت
+          </button>
+          <button type="button" id="btnRestartBot" class="py-2.5 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+            🔄 إعادة تشغيل
+          </button>
+          <button type="button" id="btnStopBot" class="py-2.5 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/40 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+            ⏹️ إيقاف البوت
+          </button>
+          <button type="button" id="btnResetSession" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-rose-300 border border-slate-700 hover:border-rose-500/40 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+            🗑️ حذف الجلسة
+          </button>
+        </div>
+      </div>
+
+      <!-- Network Resilience Switcher -->
+      <div class="lg:col-span-5 panel-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-4">
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm sm:text-base font-extrabold text-white">صمود الشبكة والوضع الصامت</h2>
+            <span id="netSpeedBadge" class="mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-900 text-emerald-300 border border-slate-700">
+              4G • ~120 KB/s
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            اختر جودة الإشارة لاختبار إعادة الاتصال الصامتة بالخلفية (<span class="mono text-amber-300">428/440</span>) دون إرسال أي رسالة تقنية للشات.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-5 gap-2">
+          <button type="button" data-net="4G" class="net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-cyan-500/25 text-cyan-200 border-cyan-400/60">4G</button>
+          <button type="button" data-net="H+" class="net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-slate-900 text-slate-300 border-slate-700">H+</button>
+          <button type="button" data-net="H" class="net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-slate-900 text-slate-300 border-slate-700">H</button>
+          <button type="button" data-net="3G" class="net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-slate-900 text-slate-300 border-slate-700">3G</button>
+          <button type="button" data-net="E" class="net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-slate-900 text-slate-300 border-slate-700">E</button>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+          <span class="text-emerald-300 font-bold">🛡️ حظر رسائل الأعذار: مفعّل</span>
+          <button type="button" id="simulateDisconnectBtn" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-400/35 font-bold transition cursor-pointer">
+            اختبار فصل مفاجئ (428)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 2: Live Interactive Terminal + WhatsApp AI & Moderation Sandbox -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- Live Interactive Terminal & Shell Console -->
+      <div class="lg:col-span-6 panel-card rounded-2xl flex flex-col overflow-hidden">
+        <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <h2 class="text-xs sm:text-sm font-extrabold text-white mr-1">الطرفية الحية (Live Terminal & Shell)</h2>
+          </div>
+          <button type="button" id="clearTerminalBtn" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">
+            تنظيف الشاشة
+          </button>
+        </div>
+
+        <!-- Quick Shell Commands -->
+        <div class="px-3 py-2.5 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap items-center gap-1.5">
+          <button type="button" data-shell="npm start" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 cursor-pointer">npm start</button>
+          <button type="button" data-shell="node index.js" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/30 cursor-pointer">node index.js</button>
+          <button type="button" data-shell="rm -rf auth_info" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-400/30 cursor-pointer">rm -rf auth_info</button>
+          <button type="button" data-shell="ls -la" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer">ls -la</button>
+          <button type="button" data-shell="status" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 cursor-pointer">status</button>
+          <button type="button" data-shell="help" class="shell-shortcut mono text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-violet-300 border border-slate-700 cursor-pointer">help</button>
+        </div>
+
+        <!-- Terminal Logs Display -->
+        <div id="terminalLogs" class="custom-scroll mono text-[11px] sm:text-xs p-4 h-[360px] overflow-y-auto bg-[#04070f] space-y-1.5 leading-relaxed">
+          <!-- Logs injected dynamically -->
+        </div>
+
+        <!-- Terminal Command Input -->
+        <form id="terminalForm" class="p-3 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2">
+          <span class="mono text-emerald-400 font-bold text-xs sm:text-sm select-none">$</span>
+          <input
+            id="terminalInput"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+            placeholder="npm start | node index.js | rm -rf auth_info | ls -la | status | help"
+            class="mono flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 focus:outline-none text-xs sm:text-sm text-slate-100 placeholder:text-slate-600"
+          />
+          <button type="submit" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs sm:text-sm transition cursor-pointer shrink-0">
+            تنفيذ
+          </button>
+        </form>
+      </div>
+
+      <!-- Interactive WhatsApp Group & AI Command Sandbox -->
+      <div class="lg:col-span-6 panel-card rounded-2xl flex flex-col overflow-hidden">
+        <!-- Sandbox Group Header -->
+        <div class="px-4 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-400 text-slate-950 font-black flex items-center justify-center text-sm">
+              أ
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 id="sandboxGroupName" class="text-xs sm:text-sm font-extrabold text-white">ديوانية المطورين والأعمال</h2>
+                <span id="sandboxLockPill" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
+                  🔓 مفتوح
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 flex items-center gap-2">
+                <span id="sandboxTargetText">الهدف المحدد: سامر (عضو)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="sandboxRoleSelect" aria-label="صلاحية المرسل" class="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:border-cyan-400 focus:outline-none">
+              <option value="admin" selected>صلاحية: مشرف</option>
+              <option value="member">صلاحية: عضو</option>
+            </select>
+            <button type="button" id="resetSandboxBtn" class="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">
+              مسح
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick WhatsApp Bot Commands -->
+        <div class="px-3 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex flex-wrap gap-1.5">
+          <button type="button" data-wa="أميرتي مرحبا، شو خطة اليوم؟" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/30 cursor-pointer">✨ أميرتي مرحبا</button>
+          <button type="button" data-wa="أميرتي منشن" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 text-violet-200 border border-violet-400/30 cursor-pointer">📢 منشن</button>
+          <button type="button" data-wa="أميرتي قفل الجروب" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-400/30 cursor-pointer">🔒 قفل الجروب</button>
+          <button type="button" data-wa="أميرتي افتح الجروب" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 border border-emerald-400/30 cursor-pointer">🔓 افتح الجروب</button>
+          <button type="button" data-wa="أميرتي ترقية" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-200 border border-sky-400/30 cursor-pointer">⭐ ترقية</button>
+          <button type="button" data-wa="أميرتي طرد" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-400/30 cursor-pointer">🚫 طرد</button>
+          <button type="button" data-wa="أميرتي غير الاسم نخبة التقنية" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer">✏️ غير الاسم</button>
+          <button type="button" data-wa="أميرتي انسى" class="wa-quick text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">🧠 انسى</button>
+        </div>
+
+        <!-- Chat Messages Area -->
+        <div id="sandboxChatBox" class="custom-scroll flex-1 p-4 space-y-3 h-[360px] overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.05),_transparent_65%)]">
+          <!-- Messages injected dynamically -->
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="sandboxForm" class="p-3 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2">
+          <input
+            id="sandboxInput"
+            type="text"
+            autocomplete="off"
+            placeholder="اكتب رسالة أو أمر: أميرتي مرحبا / أميرتي منشن / أميرتي قفل الجروب..."
+            class="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-400 focus:outline-none text-xs sm:text-sm text-white placeholder:text-slate-500"
+          />
+          <button type="submit" class="px-4 py-2 rounded-xl bg-gradient-to-l from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-xs sm:text-sm transition cursor-pointer shrink-0">
+            إرسال
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Deployment Code Modal (index.js, bot.js, package.json, .gitignore) -->
+  <div id="deployModal" class="fixed inset-0 z-40 hidden bg-slate-950/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+    <div class="max-w-4xl mx-auto panel-card rounded-3xl border-cyan-400/35 overflow-hidden my-4">
+      <div class="px-5 py-4 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-base sm:text-lg font-black text-white">ملفات الرفع الجاهزة لـ GitHub و Render</h3>
+          <p class="text-xs text-slate-400">
+            Build Command: <code class="mono text-cyan-300">npm install</code> • Start Command: <code class="mono text-emerald-300">node index.js</code>
+          </p>
+        </div>
+        <button type="button" id="closeDeployModalBtn" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer">
+          ✕ إغلاق
+        </button>
+      </div>
+
+      <!-- File Tabs -->
+      <div class="px-5 pt-3 bg-slate-950/70 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" data-file="index.js" class="code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-cyan-500/20 text-cyan-200 border-t border-x border-cyan-400/40 cursor-pointer">index.js</button>
+          <button type="button" data-file="bot.js" class="code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer">bot.js</button>
+          <button type="button" data-file="package.json" class="code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer">package.json</button>
+          <button type="button" data-file=".gitignore" class="code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer">.gitignore</button>
+        </div>
+
+        <div class="flex items-center gap-2 pb-2">
+          <button type="button" id="copyActiveFileBtn" class="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/40 text-xs font-extrabold cursor-pointer">
+            📋 نسخ هذا الملف
+          </button>
+          <button type="button" id="downloadActiveFileBtn" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 text-xs font-extrabold cursor-pointer">
+            ⬇️ تحميل الملف
+          </button>
+        </div>
+      </div>
+
+      <!-- Code Viewer -->
+      <div class="p-4 sm:p-5 bg-[#04070f]">
+        <pre id="deployCodeViewer" class="custom-scroll mono text-xs text-slate-200 h-[380px] overflow-auto leading-relaxed whitespace-pre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // Ready-to-deploy cloud files (synchronized with user's phone input when copied/downloaded)
+      function getDeploymentFiles(phone) {
+        const cleanPhone = (phone || '963958414394').replace(/\D/g, '');
+        return {
+          'package.json': JSON.stringify({
+            name: 'amirati-cloud-panel',
+            version: '1.0.0',
+            description: 'Amirati WhatsApp Bot + Web Control Panel & Terminal',
+            main: 'index.js',
+            scripts: {
+              start: 'node index.js'
+            },
+            dependencies: {
+              '@whiskeysockets/baileys': '^6.7.0',
+              pino: '^9.0.0'
+            }
+          }, null, 2),
+
+          '.gitignore': [
+            'node_modules/',
+            'auth_info/',
+            '.env',
+            'npm-debug.log*'
+          ].join('\n'),
+
+          'index.js': `const http = require('http');
+const { spawn, exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const PORT = process.env.PORT || 3000;
+const ADMIN_PASS = process.env.ADMIN_PASS || 'amirati2026';
+let currentBotPhone = (process.env.BOT_PHONE || '${cleanPhone}').replace(/\\D/g, '');
+
+let botProcess = null;
+let botStatus = 'stopped';
+let pairingCode = '';
+const logs = [];
+
+function addLog(line) {
+    const clean = String(line || '').trim();
+    if (!clean) return;
+    const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    logs.push(\`[\${stamp}] \${clean}\`);
+    if (logs.length > 250) logs.shift();
+    console.log(clean);
+
+    const match = clean.match(/PAIRING CODE:\\s*([A-Z0-9-]+)/i);
+    if (match) pairingCode = match[1];
+    if (clean.includes('[OK] Amirati is ONLINE')) {
+        botStatus = 'online';
+        pairingCode = '';
+    }
+    if (clean.includes('[CLOSE]')) {
+        botStatus = 'reconnecting';
+    }
+}
+
+function startBot() {
+    if (botProcess) return;
+    botStatus = 'starting';
+    addLog('[PANEL] Starting Amirati WhatsApp Bot...');
+    botProcess = spawn('node', ['bot.js'], {
+        cwd: __dirname,
+        env: { ...process.env, BOT_PHONE: currentBotPhone }
+    });
+
+    botProcess.stdout.on('data', (d) => d.toString().split('\\n').forEach(addLog));
+    botProcess.stderr.on('data', (d) => d.toString().split('\\n').forEach((l) => {
+        if (l.trim()) addLog(\`[ERR] \${l.trim()}\`);
+    }));
+    botProcess.on('close', (code) => {
+        addLog(\`[PANEL] Bot exited with code \${code}\`);
+        botProcess = null;
+        botStatus = 'stopped';
+    });
+}
+
+function stopBot() {
+    if (!botProcess) return;
+    botProcess.kill('SIGTERM');
+    botProcess = null;
+    botStatus = 'stopped';
+    addLog('[PANEL] Bot process stopped.');
+}
+
+function resetSession() {
+    stopBot();
+    fs.rmSync(path.join(__dirname, 'auth_info'), { recursive: true, force: true });
+    pairingCode = '';
+    addLog('[PANEL] Session auth_info deleted cleanly.');
+}
+
+const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        return res.end('OK');
+    }
+    if (req.method === 'GET' && req.url === '/api/state') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ status: botStatus, pairingCode, phone: currentBotPhone, logs }));
+    }
+    if (req.method === 'POST' && req.url === '/api/action') {
+        let body = '';
+        req.on('data', (c) => { body += c; });
+        req.on('end', () => {
+            try {
+                const payload = JSON.parse(body || '{}');
+                if (payload.pass !== ADMIN_PASS) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ ok: false, error: 'كلمة المرور غير صحيحة' }));
+                }
+                if (payload.action === 'start') startBot();
+                if (payload.action === 'stop') stopBot();
+                if (payload.action === 'restart') { stopBot(); setTimeout(startBot, 1000); }
+                if (payload.action === 'reset') resetSession();
+                if (payload.action === 'set_phone') {
+                    currentBotPhone = String(payload.phone || '').replace(/\\D/g, '');
+                    stopBot();
+                    setTimeout(startBot, 1000);
+                }
+                if (payload.action === 'exec' && payload.cmd) {
+                    addLog(\`$ \${payload.cmd}\`);
+                    exec(payload.cmd, { cwd: __dirname, timeout: 15000 }, (err, stdout, stderr) => {
+                        if (stdout) stdout.split('\\n').forEach(addLog);
+                        if (stderr) stderr.split('\\n').forEach(addLog);
+                        if (err && !stderr) addLog(\`[ERR] \${err.message}\`);
+                    });
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true }));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: e.message }));
+            }
+        });
+        return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<h1>Amirati Cloud Panel Active</h1><p>API ready at /api/state</p>');
+});
+
+server.listen(PORT, () => {
+    addLog(\`[SERVER] Amirati Cloud Panel running on port \${PORT}\`);
+    if (currentBotPhone) startBot();
+});`,
+
+          'bot.js': `const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    fetchLatestBaileysVersion,
+    DisconnectReason
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const fs = require('fs');
+const path = require('path');
+
+const AUTH_DIR = path.join(__dirname, 'auth_info');
+const origLog = console.log.bind(console);
+const origWarn = console.warn.bind(console);
+const origError = console.error.bind(console);
+
+function isCryptoNoise(args) {
+    const text = args.map((i) => (typeof i === 'string' ? i : i?.message || String(i || ''))).join(' ');
+    return ['MessageCounterError', 'Session error', 'Failed to decrypt message', 'Closing session', 'prekey', 'Bad MAC']
+        .some((k) => text.includes(k));
+}
+
+console.log = (...a) => { if (!isCryptoNoise(a)) origLog(...a); };
+console.warn = (...a) => { if (!isCryptoNoise(a)) origWarn(...a); };
+console.error = (...a) => { if (!isCryptoNoise(a)) origError(...a); };
+
+let phoneNumber = (process.env.BOT_PHONE || '${cleanPhone}').replace(/\\D/g, '');
+let activeSock = null;
+let isStarting = false;
+let pairingInProgress = false;
+let reconnectTimer = null;
+let reconnectCount = 0;
+
+const chatMemory = new Map();
+const processedMsgIds = new Set();
+
+const SYSTEM_PROMPT = \`
+أنت "أميرتي"، مساعدة ذكاء اصطناعي ذكية جداً ومشرفة متفاعلة على واتساب.
+1. افهمي سياق الكلام وتفاعلي مع اسم المتحدث بذكاء واختصار مفيد.
+2. لا تذكري أبداً أعذاراً تقنية أو حالة الشبكة أو إعادة المحاولة.
+\`.trim();
+
+async function askAmiratiAI(jid, speaker, promptText) {
+    if (!chatMemory.has(jid)) chatMemory.set(jid, []);
+    const history = chatMemory.get(jid);
+    history.push({ speaker, role: 'user', text: promptText.slice(0, 320) });
+    if (history.length > 8) history.shift();
+
+    const transcript = history.map((m) => \`\${m.role === 'user' ? m.speaker : 'أميرتي'}: \${m.text}\`).join('\\n');
+    const fullPrompt = \`\${SYSTEM_PROMPT}\\n\\n--- المحادثة ---\\n\${transcript}\\n\\nردي بصفتك أميرتي على (\${speaker}):\`;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), attempt === 1 ? 18000 : 28000);
+        try {
+            const res = await fetch(\`https://text.pollinations.ai/\${encodeURIComponent(fullPrompt)}\`, { signal: controller.signal });
+            clearTimeout(timer);
+            if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+            const reply = (await res.text()).trim();
+            if (reply) {
+                history.push({ speaker: 'أميرتي', role: 'assistant', text: reply.slice(0, 320) });
+                return reply;
+            }
+        } catch {
+            clearTimeout(timer);
+            await new Promise((r) => setTimeout(r, 1500 * attempt));
+        }
+    }
+    throw new Error('AI exhausted silently');
+}
+
+function scheduleNextConnect(delayMs = null) {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectCount += 1;
+    const wait = delayMs ?? Math.min(7000 * reconnectCount, 35000);
+    origLog(\`[NET] Silent retry in \${Math.round(wait / 1000)}s...\`);
+    reconnectTimer = setTimeout(bootAmirati, wait);
+}
+
+async function bootAmirati() {
+    if (isStarting) return;
+    isStarting = true;
+    try {
+        if (activeSock) {
+            try { activeSock.end(undefined); } catch {}
+            activeSock = null;
+        }
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        let version = [2, 3000, 1015901307];
+        try {
+            const latest = await fetchLatestBaileysVersion();
+            version = latest.version;
+        } catch {}
+
+        const sock = makeWASocket({
+            version,
+            auth: state,
+            logger: pino({ level: 'silent' }),
+            browser: ['Ubuntu', 'Chrome', '22.04.4'],
+            syncFullHistory: false,
+            markOnlineOnConnect: false,
+            connectTimeoutMs: 120000,
+            defaultQueryTimeoutMs: 120000,
+            keepAliveIntervalMs: 45000
+        });
+
+        activeSock = sock;
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+            if (!sock.authState.creds.registered && (connection === 'connecting' || Boolean(qr)) && !pairingInProgress) {
+                pairingInProgress = true;
+                try {
+                    await new Promise((r) => setTimeout(r, 4500));
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    origLog('PAIRING CODE:', code);
+                } catch {
+                    pairingInProgress = false;
+                }
+            }
+
+            if (connection === 'open') {
+                isStarting = false;
+                pairingInProgress = false;
+                reconnectCount = 0;
+                origLog('[OK] Amirati is ONLINE and ready!');
+            } else if (connection === 'close') {
+                isStarting = false;
+                pairingInProgress = false;
+                const code = lastDisconnect?.error?.output?.statusCode;
+                origLog('[CLOSE] Code:', code || 'unknown');
+                if (code === DisconnectReason.loggedOut) {
+                    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+                    return scheduleNextConnect(8000);
+                }
+                scheduleNextConnect(code === 440 ? 11000 : code === 428 ? 12000 : null);
+            }
+        });
+
+        sock.ev.on('messages.upsert', async ({ messages, type }) => {
+            try {
+                if (type !== 'notify' && type !== 'append') return;
+                const msg = messages?.[0];
+                if (!msg?.message || processedMsgIds.has(msg.key?.id)) return;
+                processedMsgIds.add(msg.key?.id);
+
+                const chatJid = msg.key.remoteJid;
+                if (!chatJid || chatJid === 'status@broadcast') return;
+                const isGroup = chatJid.endsWith('@g.us');
+                const senderJid = isGroup ? (msg.key.participant || msg.participant) : chatJid;
+                const speaker = msg.pushName || 'صديقي';
+                const rawText = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
+                if (!rawText) return;
+
+                const botJid = sock.user?.id ? \`\${sock.user.id.split(':')[0]}@s.whatsapp.net\` : '';
+                const quotedUser = msg.message.extendedTextMessage?.contextInfo?.participant;
+                const called = /^(يا\\s*)?(ا|أ)ميرتي/.test(rawText) || (botJid && quotedUser === botJid);
+                if (!called) return;
+
+                const body = rawText.replace(/^(يا\\s*)?(ا|أ)ميرتي[\\s،,:!؟]*/i, '').trim();
+                const cmd = body.toLowerCase();
+
+                if (cmd === 'انسى' || cmd === 'تصفير') {
+                    chatMemory.delete(chatJid);
+                    await sock.sendMessage(chatJid, { text: '🧠✨ تم مسح ذاكرة المحادثة، نبدأ من جديد!' }, { quoted: msg });
+                    return;
+                }
+
+                if (isGroup) {
+                    const meta = await sock.groupMetadata(chatJid);
+                    const member = meta.participants.find((p) => p.id === senderJid);
+                    const isAdmin = msg.key.fromMe || member?.admin === 'admin' || member?.admin === 'superadmin';
+
+                    if (['قفل', 'قفل الجروب', 'اقفل الجروب'].includes(cmd)) {
+                        if (!isAdmin) return sock.sendMessage(chatJid, { text: '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.' }, { quoted: msg });
+                        await sock.groupSettingUpdate(chatJid, 'announcement');
+                        return sock.sendMessage(chatJid, { text: '🔒 تم قفل المجموعة (الإرسال للمشرفين فقط).' }, { quoted: msg });
+                    }
+                    if (['فتح', 'افتح الجروب', 'فتح الجروب'].includes(cmd)) {
+                        if (!isAdmin) return sock.sendMessage(chatJid, { text: '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.' }, { quoted: msg });
+                        await sock.groupSettingUpdate(chatJid, 'not_announcement');
+                        return sock.sendMessage(chatJid, { text: '🔓 تم فتح المجموعة للجميع.' }, { quoted: msg });
+                    }
+                    if (['منشن', 'الكل'].includes(cmd)) {
+                        if (!isAdmin) return sock.sendMessage(chatJid, { text: '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.' }, { quoted: msg });
+                        const mentions = meta.participants.map((p) => p.id);
+                        return sock.sendMessage(chatJid, { text: mentions.map((id) => \`@\${id.split('@')[0]}\`).join(' '), mentions }, { quoted: msg });
+                    }
+                    if (cmd === 'طرد' && quotedUser) {
+                        if (!isAdmin) return sock.sendMessage(chatJid, { text: '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.' }, { quoted: msg });
+                        await sock.groupParticipantsUpdate(chatJid, [quotedUser], 'remove');
+                        return sock.sendMessage(chatJid, { text: '🚫 تم إخراج العضو من المجموعة.' }, { quoted: msg });
+                    }
+                    if (cmd === 'ترقية' && quotedUser) {
+                        if (!isAdmin) return sock.sendMessage(chatJid, { text: '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.' }, { quoted: msg });
+                        await sock.groupParticipantsUpdate(chatJid, [quotedUser], 'promote');
+                        return sock.sendMessage(chatJid, { text: '⭐ تمت ترقية العضو إلى مشرف.' }, { quoted: msg });
+                    }
+                }
+
+                if (!body) {
+                    return sock.sendMessage(chatJid, { text: \`هلا يا *\${speaker}*! ✨ أنا أميرتي معك، شو بتأمر؟\` }, { quoted: msg });
+                }
+
+                const reply = await askAmiratiAI(chatJid, speaker, body);
+                await sock.sendMessage(chatJid, { text: reply }, { quoted: msg });
+            } catch {}
+        });
+    } catch {
+        isStarting = false;
+        scheduleNextConnect();
+    }
+}
+
+bootAmirati();`
+        };
+      }
+
+      const NETWORKS = {
+        '4G': { speed: '~120 KB/s', delay: 450, dropChance: 0.0 },
+        'H+': { speed: '~45 KB/s',  delay: 900, dropChance: 0.08 },
+        'H':  { speed: '~8 KB/s',   delay: 1450, dropChance: 0.2 },
+        '3G': { speed: '~15 KB/s',  delay: 1200, dropChance: 0.14 },
+        'E':  { speed: '~2 KB/s',   delay: 2100, dropChance: 0.32 }
+      };
+
+      const appState = {
+        botStatus: 'online', // 'online' | 'reconnecting' | 'stopped'
+        panelLocked: false,
+        network: '4G',
+        pairingCode: '',
+        groupName: 'ديوانية المطورين والأعمال',
+        groupLocked: false,
+        members: [
+          { id: 'm1', name: 'سامر', role: 'member' },
+          { id: 'm2', name: 'ليلى', role: 'admin' },
+          { id: 'm3', name: 'كريم', role: 'member' }
+        ],
+        targetMemberId: 'm1',
+        memory: [],
+        activeCodeFile: 'index.js'
+      };
+
+      const el = {
+        toastContainer: document.getElementById('toastContainer'),
+        toastDot: document.getElementById('toastDot'),
+        toastMsg: document.getElementById('toastMsg'),
+        toastCloseBtn: document.getElementById('toastCloseBtn'),
+        globalStatusPill: document.getElementById('globalStatusPill'),
+        globalStatusDot: document.getElementById('globalStatusDot'),
+        globalStatusText: document.getElementById('globalStatusText'),
+        pairingBanner: document.getElementById('pairingBanner'),
+        pairingCodeValue: document.getElementById('pairingCodeValue'),
+        confirmPairBtn: document.getElementById('confirmPairBtn'),
+        lockToggleBtn: document.getElementById('lockToggleBtn'),
+        adminPassInput: document.getElementById('adminPassInput'),
+        botPhoneInput: document.getElementById('botPhoneInput'),
+        savePhoneStartBtn: document.getElementById('savePhoneStartBtn'),
+        btnStartBot: document.getElementById('btnStartBot'),
+        btnRestartBot: document.getElementById('btnRestartBot'),
+        btnStopBot: document.getElementById('btnStopBot'),
+        btnResetSession: document.getElementById('btnResetSession'),
+        netSpeedBadge: document.getElementById('netSpeedBadge'),
+        simulateDisconnectBtn: document.getElementById('simulateDisconnectBtn'),
+        terminalLogs: document.getElementById('terminalLogs'),
+        terminalForm: document.getElementById('terminalForm'),
+        terminalInput: document.getElementById('terminalInput'),
+        clearTerminalBtn: document.getElementById('clearTerminalBtn'),
+        sandboxGroupName: document.getElementById('sandboxGroupName'),
+        sandboxLockPill: document.getElementById('sandboxLockPill'),
+        sandboxTargetText: document.getElementById('sandboxTargetText'),
+        sandboxRoleSelect: document.getElementById('sandboxRoleSelect'),
+        resetSandboxBtn: document.getElementById('resetSandboxBtn'),
+        sandboxChatBox: document.getElementById('sandboxChatBox'),
+        sandboxForm: document.getElementById('sandboxForm'),
+        sandboxInput: document.getElementById('sandboxInput'),
+        openDeployModalBtn: document.getElementById('openDeployModalBtn'),
+        closeDeployModalBtn: document.getElementById('closeDeployModalBtn'),
+        deployModal: document.getElementById('deployModal'),
+        deployCodeViewer: document.getElementById('deployCodeViewer'),
+        copyActiveFileBtn: document.getElementById('copyActiveFileBtn'),
+        downloadActiveFileBtn: document.getElementById('downloadActiveFileBtn')
+      };
+
+      let toastTimer = null;
+      let reconnectTimer = null;
+
+      function notify(msg, type = 'info') {
+        if (toastTimer) clearTimeout(toastTimer);
+        el.toastMsg.textContent = msg;
+        const colors = {
+          info: 'bg-cyan-400',
+          success: 'bg-emerald-400',
+          warn: 'bg-amber-400',
+          error: 'bg-rose-400'
+        };
+        el.toastDot.className = `w-2.5 h-2.5 rounded-full shrink-0 ${colors[type] || colors.info}`;
+        el.toastContainer.classList.remove('hidden');
+        toastTimer = setTimeout(() => el.toastContainer.classList.add('hidden'), 3200);
+      }
+
+      el.toastCloseBtn.addEventListener('click', () => el.toastContainer.classList.add('hidden'));
+
+      function esc(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function timestamp() {
+        return new Date().toTimeString().slice(0, 8);
+      }
+
+      function logTerminal(tag, message, color = 'text-slate-300') {
+        const line = document.createElement('div');
+        line.className = 'flex items-start gap-2';
+        line.innerHTML = `
+          <span class="text-slate-600 shrink-0">[${timestamp()}]</span>
+          <span class="font-bold shrink-0 ${color}">[${tag}]</span>
+          <span class="text-slate-200 break-all">${esc(message)}</span>
+        `;
+        el.terminalLogs.appendChild(line);
+        el.terminalLogs.scrollTop = el.terminalLogs.scrollHeight;
+      }
+
+      function requireUnlocked() {
+        if (!appState.panelLocked) return true;
+        if (el.adminPassInput.value.trim() === 'amirati2026') {
+          appState.panelLocked = false;
+          syncStatusUI();
+          return true;
+        }
+        notify('اللوحة مقفلة — أدخل كلمة المرور الصحيحة (amirati2026)', 'warn');
+        return false;
+      }
+
+      function syncStatusUI() {
+        // Global status pill
+        if (appState.botStatus === 'online') {
+          el.globalStatusPill.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-400/40 flex items-center gap-2';
+          el.globalStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 beacon';
+          el.globalStatusText.textContent = 'متصل ويعمل (ONLINE)';
+        } else if (appState.botStatus === 'reconnecting') {
+          el.globalStatusPill.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-amber-500/15 text-amber-300 border border-amber-400/40 flex items-center gap-2';
+          el.globalStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 beacon';
+          el.globalStatusText.textContent = 'إعادة اتصال صامتة...';
+        } else {
+          el.globalStatusPill.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-rose-500/15 text-rose-300 border border-rose-400/40 flex items-center gap-2';
+          el.globalStatusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+          el.globalStatusText.textContent = 'متوقف (STOPPED)';
+        }
+
+        // Lock button
+        el.lockToggleBtn.textContent = appState.panelLocked ? '🔒 اللوحة مقفلة (فتح)' : '🔓 اللوحة مفتوحة (قفل)';
+
+        // Pairing banner
+        if (appState.pairingCode) {
+          el.pairingBanner.classList.remove('hidden');
+          el.pairingCodeValue.textContent = appState.pairingCode;
+        } else {
+          el.pairingBanner.classList.add('hidden');
+        }
+
+        // Network UI
+        const net = NETWORKS[appState.network];
+        el.netSpeedBadge.textContent = `${appState.network} • ${net.speed}`;
+        document.querySelectorAll('.net-profile-btn').forEach((btn) => {
+          const isSelected = btn.dataset.net === appState.network;
+          btn.className = isSelected
+            ? 'net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-cyan-500/25 text-cyan-200 border-cyan-400/60'
+            : 'net-profile-btn py-2.5 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-400/35';
+        });
+
+        // Sandbox Group UI
+        el.sandboxGroupName.textContent = appState.groupName;
+        el.sandboxLockPill.textContent = appState.groupLocked ? '🔒 مقفل (مشرفون)' : '🔓 مفتوح';
+        el.sandboxLockPill.className = appState.groupLocked
+          ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/30'
+          : 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30';
+
+        const target = appState.members.find((m) => m.id === appState.targetMemberId) || appState.members[0];
+        el.sandboxTargetText.textContent = target
+          ? `الهدف المحدد: ${target.name} (${target.role === 'admin' ? 'مشرف' : 'عضو'})`
+          : 'لا يوجد عضو محدد حالياً';
+      }
+
+      function generatePairingCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const part = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        return `${part(4)}-${part(4)}`;
+      }
+
+      function triggerSilentRetry(code = 428) {
+        if (appState.botStatus === 'stopped') return;
+        appState.botStatus = 'reconnecting';
+        syncStatusUI();
+        logTerminal('CLOSE', `Socket closed with code ${code} — Silent resilience active (zero chat notice).`, 'text-amber-300');
+        logTerminal('SILENT-NET', 'Reconnecting silently in background (5s)...', 'text-cyan-300');
+
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          if (appState.botStatus === 'stopped') return;
+          appState.botStatus = 'online';
+          syncStatusUI();
+          logTerminal('OK', `Amirati reconnected seamlessly on ${appState.network}.`, 'text-emerald-300');
+        }, 5000);
+      }
+
+      // Server Control Actions
+      el.lockToggleBtn.addEventListener('click', () => {
+        if (!appState.panelLocked) {
+          appState.panelLocked = true;
+          syncStatusUI();
+          notify('تم قفل لوحة التحكم بكلمة المرور', 'info');
+        } else {
+          requireUnlocked();
+        }
+      });
+
+      el.savePhoneStartBtn.addEventListener('click', () => {
+        if (!requireUnlocked()) return;
+        const phone = el.botPhoneInput.value.replace(/\D/g, '');
+        if (!phone) {
+          notify('أدخل رقم الهاتف مع رمز الدولة أولاً', 'warn');
+          return;
+        }
+        el.botPhoneInput.value = phone;
+        appState.botStatus = 'online';
+        appState.pairingCode = generatePairingCode();
+        syncStatusUI();
+        logTerminal('AUTH', `BOT_PHONE set to ${phone}. Requesting WhatsApp pairing code...`, 'text-cyan-300');
+        logTerminal('PAIRING', `PAIRING CODE: ${appState.pairingCode}`, 'text-emerald-300');
+        notify('تم توليد كود الربط في الأعلى', 'success');
+      });
+
+      el.confirmPairBtn.addEventListener('click', () => {
+        appState.pairingCode = '';
+        appState.botStatus = 'online';
+        syncStatusUI();
+        logTerminal('OK', 'WhatsApp device linked! Amirati is ONLINE and ready.', 'text-emerald-300');
+        notify('تم ربط واتساب بنجاح!', 'success');
+      });
+
+      el.btnStartBot.addEventListener('click', () => {
+        if (!requireUnlocked()) return;
+        appState.botStatus = 'online';
+        syncStatusUI();
+        logTerminal('PANEL', 'Starting Amirati process (node index.js)...', 'text-emerald-300');
+        logTerminal('OK', 'Amirati is ONLINE on cloud server.', 'text-emerald-300');
+        notify('تم تشغيل البوت', 'success');
+      });
+
+      el.btnRestartBot.addEventListener('click', () => {
+        if (!requireUnlocked()) return;
+        appState.botStatus = 'reconnecting';
+        syncStatusUI();
+        logTerminal('PANEL', 'Restarting Amirati service...', 'text-amber-300');
+        setTimeout(() => {
+          appState.botStatus = 'online';
+          syncStatusUI();
+          logTerminal('OK', 'Amirati restarted and ONLINE.', 'text-emerald-300');
+          notify('تمت إعادة تشغيل البوت', 'success');
+        }, 1200);
+      });
+
+      el.btnStopBot.addEventListener('click', () => {
+        if (!requireUnlocked()) return;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        appState.botStatus = 'stopped';
+        appState.pairingCode = '';
+        syncStatusUI();
+        logTerminal('STOP', 'Bot process stopped cleanly (SIGTERM).', 'text-rose-400');
+        notify('تم إيقاف البوت', 'warn');
+      });
+
+      el.btnResetSession.addEventListener('click', () => {
+        if (!requireUnlocked()) return;
+        appState.pairingCode = '';
+        appState.botStatus = 'stopped';
+        syncStatusUI();
+        logTerminal('AUTH', 'Deleted auth_info directory. Ready for fresh pairing.', 'text-rose-300');
+        notify('تم حذف الجلسة (auth_info)', 'warn');
+      });
+
+      // Network Profile Buttons
+      document.querySelectorAll('.net-profile-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          appState.network = btn.dataset.net;
+          syncStatusUI();
+          logTerminal('NET', `Switched network profile to ${appState.network} (${NETWORKS[appState.network].speed}).`, 'text-cyan-300');
+        });
+      });
+
+      el.simulateDisconnectBtn.addEventListener('click', () => {
+        if (appState.botStatus === 'stopped') {
+          notify('شغّل البوت أولاً لاختبار الفصل الصامت', 'warn');
+          return;
+        }
+        triggerSilentRetry(428);
+      });
+
+      // Interactive Terminal Shell
+      function executeShellCommand(rawCmd) {
+        const cmd = rawCmd.trim();
+        if (!cmd) return;
+        logTerminal('SHELL', `$ ${cmd}`, 'text-cyan-300');
+
+        const lower = cmd.toLowerCase();
+        if (lower === 'help') {
+          logTerminal('HELP', 'Available commands: npm start | node index.js | rm -rf auth_info | ls -la | status | clear', 'text-violet-300');
+          return;
+        }
+        if (lower === 'clear') {
+          el.terminalLogs.innerHTML = '';
+          return;
+        }
+        if (lower === 'ls -la' || lower === 'ls') {
+          logTerminal('OUT', 'drwxr-xr-x  index.js  bot.js  package.json  .gitignore  node_modules/  auth_info/', 'text-slate-300');
+          return;
+        }
+        if (lower === 'status') {
+          logTerminal('STATUS', `Bot: ${appState.botStatus.toUpperCase()} | Network: ${appState.network} | Memory items: ${appState.memory.length}`, 'text-emerald-300');
+          return;
+        }
+        if (lower === 'npm start' || lower === 'node index.js' || lower === 'node bot.js') {
+          appState.botStatus = 'online';
+          syncStatusUI();
+          logTerminal('SERVER', 'Amirati Cloud Panel listening on port 3000', 'text-emerald-300');
+          logTerminal('OK', 'Amirati is ONLINE and ready!', 'text-emerald-300');
+          return;
+        }
+        if (lower === 'rm -rf auth_info') {
+          appState.pairingCode = '';
+          syncStatusUI();
+          logTerminal('AUTH', 'Session folder auth_info removed. Run "حفظ وطلب كود" to re-pair.', 'text-amber-300');
+          return;
+        }
+        logTerminal('EXEC', `Executed "${cmd}" (exit code 0)`, 'text-slate-400');
+      }
+
+      el.terminalForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        executeShellCommand(el.terminalInput.value);
+        el.terminalInput.value = '';
+      });
+
+      document.querySelectorAll('.shell-shortcut').forEach((btn) => {
+        btn.addEventListener('click', () => executeShellCommand(btn.dataset.shell));
+      });
+
+      el.clearTerminalBtn.addEventListener('click', () => {
+        el.terminalLogs.innerHTML = '';
+        logTerminal('TERM', 'Console cleared.', 'text-slate-500');
+      });
+
+      // WhatsApp Sandbox Chat
+      function appendChatBubble(sender, text, isBot = false) {
+        const row = document.createElement('div');
+        row.className = `flex flex-col ${isBot ? 'items-start' : 'items-end'}`;
+        row.innerHTML = `
+          <div class="max-w-[86%] rounded-2xl px-3.5 py-2.5 ${
+            isBot
+              ? 'rounded-tr-sm bg-slate-800/95 border border-cyan-500/25 text-slate-100'
+              : 'rounded-tl-sm bg-gradient-to-br from-emerald-600/30 to-cyan-600/25 border border-emerald-400/35 text-white'
+          }">
+            <div class="flex items-center justify-between gap-3 mb-1">
+              <span class="text-[11px] font-extrabold ${isBot ? 'text-cyan-300' : 'text-emerald-300'}">${esc(sender)}</span>
+              <span class="mono text-[10px] text-slate-400">${timestamp()}</span>
+            </div>
+            <div class="text-xs sm:text-sm whitespace-pre-line leading-relaxed">${esc(text)}</div>
+          </div>
+        `;
+        el.sandboxChatBox.appendChild(row);
+        el.sandboxChatBox.scrollTop = el.sandboxChatBox.scrollHeight;
+      }
+
+      async function handleSandboxMessage(rawText) {
+        const text = rawText.trim();
+        if (!text) return;
+
+        const isAdmin = el.sandboxRoleSelect.value === 'admin';
+        const senderLabel = isAdmin ? 'أنت (مشرف)' : 'أنت (عضو)';
+        appendChatBubble(senderLabel, text, false);
+
+        const called = /^(يا\s*)?(ا|أ)ميرتي/.test(text);
+        if (!called) {
+          appState.memory.push(text);
+          if (appState.memory.length > 8) appState.memory.shift();
+          return;
+        }
+
+        if (appState.botStatus === 'stopped') {
+          logTerminal('SKIP', 'Message ignored because bot is STOPPED.', 'text-rose-400');
+          return;
+        }
+
+        const net = NETWORKS[appState.network];
+        if (Math.random() < net.dropChance) {
+          triggerSilentRetry(428);
+          return;
+        }
+
+        const body = text.replace(/^(يا\s*)?(ا|أ)ميرتي[\s،,:!؟]*/i, '').trim();
+        const cmd = body.toLowerCase();
+
+        await new Promise((r) => setTimeout(r, net.delay));
+
+        if (cmd === 'انسى' || cmd === 'تصفير') {
+          appState.memory = [];
+          appendChatBubble('أميرتي', '🧠✨ تم مسح ذاكرة المحادثة، نبدأ من جديد!', true);
+          logTerminal('MEMORY', 'Conversation memory cleared.', 'text-violet-300');
+          return;
+        }
+
+        if (cmd === 'منشن' || cmd === 'الكل') {
+          if (!isAdmin) {
+            appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+            return;
+          }
+          const tags = appState.members.map((m) => `@${m.name}`).join(' ');
+          appendChatBubble('أميرتي', `📢 تنبيه للجميع:\n${tags || '@الكل'}`, true);
+          logTerminal('GROUP', 'Sent @all mention notification.', 'text-emerald-300');
+          return;
+        }
+
+        if (['قفل', 'قفل الجروب', 'اقفل الجروب'].includes(cmd)) {
+          if (!isAdmin) {
+            appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+            return;
+          }
+          appState.groupLocked = true;
+          syncStatusUI();
+          appendChatBubble('أميرتي', '🔒 تم قفل المجموعة (الإرسال للمشرفين فقط).', true);
+          logTerminal('GROUP', 'Group locked (announcement mode).', 'text-amber-300');
+          return;
+        }
+
+        if (['فتح', 'افتح الجروب', 'فتح الجروب'].includes(cmd)) {
+          if (!isAdmin) {
+            appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+            return;
+          }
+          appState.groupLocked = false;
+          syncStatusUI();
+          appendChatBubble('أميرتي', '🔓 تم فتح المجموعة للجميع.', true);
+          logTerminal('GROUP', 'Group unlocked (not_announcement mode).', 'text-emerald-300');
+          return;
+        }
+
+        const renameMatch = body.match(/^غير\s+الاسم(?:\s+الى|\s+إلى)?\s+(.+)/i);
+        if (renameMatch) {
+          if (!isAdmin) {
+            appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+            return;
+          }
+          appState.groupName = renameMatch[1].trim();
+          syncStatusUI();
+          appendChatBubble('أميرتي', `✏️ تم تغيير اسم المجموعة إلى: *${appState.groupName}*`, true);
+          logTerminal('GROUP', `Subject updated to "${appState.groupName}".`, 'text-cyan-300');
+          return;
+        }
+
+        const target = appState.members.find((m) => m.id === appState.targetMemberId) || appState.members[0];
+        if (cmd === 'ترقية') {
+          if (!isAdmin) return appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+          if (!target) return appendChatBubble('أميرتي', 'ℹ️ لا يوجد عضو محدد للترقية.', true);
+          target.role = 'admin';
+          syncStatusUI();
+          appendChatBubble('أميرتي', `⭐ تمت ترقية *${target.name}* إلى مشرف.`, true);
+          logTerminal('GROUP', `Promoted ${target.name} to admin.`, 'text-emerald-300');
+          return;
+        }
+
+        if (cmd === 'طرد') {
+          if (!isAdmin) return appendChatBubble('أميرتي', '⛔ هذا الأمر مخصص لمشرفي المجموعة فقط.', true);
+          if (!target) return appendChatBubble('أميرتي', 'ℹ️ لا يوجد عضو محدد للإخراج.', true);
+          const removed = target.name;
+          appState.members = appState.members.filter((m) => m.id !== target.id);
+          appState.targetMemberId = appState.members[0]?.id || null;
+          syncStatusUI();
+          appendChatBubble('أميرتي', `🚫 تم إخراج *${removed}* من المجموعة.`, true);
+          logTerminal('GROUP', `Removed ${removed} from participants.`, 'text-rose-300');
+          return;
+        }
+
+        if (!body) {
+          appendChatBubble('أميرتي', 'هلا بك! ✨ أنا أميرتي معك، شو بتأمر؟', true);
+          return;
+        }
+
+        appState.memory.push(body);
+        if (appState.memory.length > 8) appState.memory.shift();
+
+        const aiReply = body.includes('مرحبا') || body.includes('خطة')
+          ? 'أهلاً بك! ✨ السيرفر السحابي جاهز، ونبدأ بتشغيل الأوامر ومراقبة الأداء بكل سلاسة.'
+          : `تم استلام رسالتك (${body}) بنجاح. أنا متابعة معك بوعي كامل للسياق!`;
+
+        appendChatBubble('أميرتي', aiReply, true);
+        logTerminal('SENT', `Replied over ${appState.network} cleanly.`, 'text-emerald-300');
+      }
+
+      el.sandboxForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleSandboxMessage(el.sandboxInput.value);
+        el.sandboxInput.value = '';
+      });
+
+      document.querySelectorAll('.wa-quick').forEach((btn) => {
+        btn.addEventListener('click', () => handleSandboxMessage(btn.dataset.wa));
+      });
+
+      el.resetSandboxBtn.addEventListener('click', () => {
+        el.sandboxChatBox.innerHTML = '';
+        appState.memory = [];
+        appState.groupLocked = false;
+        appState.groupName = 'ديوانية المطورين والأعمال';
+        appState.members = [
+          { id: 'm1', name: 'سامر', role: 'member' },
+          { id: 'm2', name: 'ليلى', role: 'admin' },
+          { id: 'm3', name: 'كريم', role: 'member' }
+        ];
+        appState.targetMemberId = 'm1';
+        syncStatusUI();
+        seedSandbox();
+        notify('تمت إعادة ضبط المحادثة التجريبية', 'info');
+      });
+
+      // Deployment Modal Logic
+      function renderDeployCode(fileName) {
+        appState.activeCodeFile = fileName;
+        const files = getDeploymentFiles(el.botPhoneInput.value);
+        el.deployCodeViewer.textContent = files[fileName] || '';
+        document.querySelectorAll('.code-tab').forEach((tab) => {
+          const active = tab.dataset.file === fileName;
+          tab.className = active
+            ? 'code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-cyan-500/20 text-cyan-200 border-t border-x border-cyan-400/40 cursor-pointer'
+            : 'code-tab mono text-xs font-bold px-3.5 py-2 rounded-t-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer';
+        });
+      }
+
+      el.openDeployModalBtn.addEventListener('click', () => {
+        renderDeployCode(appState.activeCodeFile);
+        el.deployModal.classList.remove('hidden');
+      });
+
+      el.closeDeployModalBtn.addEventListener('click', () => {
+        el.deployModal.classList.add('hidden');
+      });
+
+      document.querySelectorAll('.code-tab').forEach((tab) => {
+        tab.addEventListener('click', () => renderDeployCode(tab.dataset.file));
+      });
+
+      el.copyActiveFileBtn.addEventListener('click', () => {
+        const text = el.deployCodeViewer.textContent;
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        notify(`تم نسخ ملف ${appState.activeCodeFile} بنجاح`, 'success');
+      });
+
+      el.downloadActiveFileBtn.addEventListener('click', () => {
+        const text = el.deployCodeViewer.textContent;
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = appState.activeCodeFile;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        notify(`بدأ تحميل ${appState.activeCodeFile}`, 'info');
+      });
+
+      function seedSandbox() {
+        appendChatBubble('أميرتي', 'أهلاً بك! ✨ جرب الأوامر السريعة بالأعلى أو اكتب أي نداء يبدأ بـ "أميرتي".', true);
+      }
+
+      // Initial Boot
+      syncStatusUI();
+      seedSandbox();
+      logTerminal('SERVER', 'Amirati Cloud Control Panel initialized on port 3000.', 'text-emerald-300');
+      logTerminal('INFO', 'Type "help" in terminal or click "أكواد الرفع" for GitHub/Render files.', 'text-cyan-300');
+    })();
+  </script>
+</body>
+</html>
